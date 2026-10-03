@@ -107,6 +107,8 @@ Known issues:
 
 - [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (BSD 3-Clause), which builds on [Xenia](https://xenia.jp).
 - Fonts: Permanent Marker (Apache 2.0), Kalam, Poppins, Nunito (SIL OFL 1.1) — see `assets/fonts/`.
+- App icon: an image of the curtain block from *Catherine*, © ATLUS / SEGA, used
+  here as a fan-project icon only. It is not covered by this project's license.
 - See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 *Catherine* is © ATLUS / SEGA. This is an unofficial fan project, not affiliated

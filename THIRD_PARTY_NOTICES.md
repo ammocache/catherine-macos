@@ -18,3 +18,9 @@ https://github.com/rexglue/rexglue-sdk — BSD 3-Clause License.
 The files in `patches/` are modifications to the SDK and are provided under the
 same BSD 3-Clause terms. The SDK in turn includes code from Xenia
 (BSD 3-Clause) and other projects listed in its own notices.
+
+## App icon
+
+`assets/AppIcon.iconset` is made from an image of an in-game block from *Catherine*
+(© ATLUS / SEGA). It is used only as the icon of this unofficial fan project, is not
+covered by this project's license, and will be removed on request from the rights holder.
