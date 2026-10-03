@@ -24,3 +24,9 @@ same BSD 3-Clause terms. The SDK in turn includes code from Xenia
 `assets/AppIcon.iconset` is made from an image of an in-game block from *Catherine*
 (© ATLUS / SEGA). It is used only as the icon of this unofficial fan project, is not
 covered by this project's license, and will be removed on request from the rights holder.
+
+## Banner
+
+`docs/images/banner.png` is a fan-made banner by the project author that includes artwork from
+*Catherine* (© ATLUS / SEGA). It is used only to decorate this unofficial fan project, is not
+covered by this project's license, and will be removed on request from the rights holder.

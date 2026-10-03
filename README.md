@@ -1,4 +1,4 @@
-<h1 align="center">✦ Catherine for macOS ✦</h1>
+<p align="center"><img src="docs/images/banner.png" alt="Catherine recomp" width="720"></p>
 <p align="center"><i>A native Apple Silicon recompilation of Catherine (Atlus, 2011, Xbox 360)</i></p>
 
 ---
@@ -107,12 +107,14 @@ Known issues:
 
 This project's own code (settings menu, setup screen, scripts, patches) is
 released under the [MIT License](LICENSE). The license does not cover the game
-or the app icon artwork, which belong to ATLUS / SEGA.
+or the icon and banner artwork, which use ATLUS / SEGA material.
 
 - [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (BSD 3-Clause), which builds on [Xenia](https://xenia.jp).
 - Fonts: Permanent Marker (Apache 2.0), Kalam, Poppins, Nunito (SIL OFL 1.1) — see `assets/fonts/`.
 - App icon: an image of the curtain block from *Catherine*, © ATLUS / SEGA, used
   here as a fan-project icon only. It is not covered by this project's license.
+- Banner: made by the project author using artwork from *Catherine*, © ATLUS / SEGA, used
+  here as fan-project artwork only. It is not covered by this project's license.
 - See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 *Catherine* is © ATLUS / SEGA. This is an unofficial fan project, not affiliated
