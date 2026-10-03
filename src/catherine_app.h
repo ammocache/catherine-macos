@@ -9,7 +9,8 @@
 #include <rex/ui/keybinds.h>
 #include <rex/ui/window.h>
 
-#include "game_folder.h"
+#include "game_version.h"
+#include "setup_screen.h"
 #include "relaunch.h"
 #include "settings_menu.h"
 
@@ -85,32 +86,50 @@ class CatherineApp : public rex::ReXApp {
     }
   }
 
-  // Game folder: command line > saved setting > ask the player (first run).
+  // Game folder: command line > saved setting > setup screen (first run, moved
+  // files, or a different version of the game).
   std::optional<rex::PathConfig> OnFinalizePaths(
       const rex::PathConfig& defaults, std::function<void(rex::PathConfig)> resume) override {
-    (void)resume;
     rex::PathConfig paths = defaults;
-    if (!catherine::LooksLikeGameFolder(paths.game_data_root)) {
+    if (catherine::CheckGameFolder(paths.game_data_root) == catherine::GameCheck::kMissing) {
       // The SDK reads the folder before the config file is loaded; use the
       // saved value now that it is.
       std::string saved = rex::cvar::GetFlagByName("game_data_root");
-      if (catherine::LooksLikeGameFolder(saved)) paths.game_data_root = saved;
+      if (!saved.empty()) paths.game_data_root = saved;
     }
-    bool retry = false;
-    while (!catherine::LooksLikeGameFolder(paths.game_data_root)) {
-      auto chosen = catherine::AskForGameFolder(retry);
-      if (chosen.empty()) break;  // cancelled: startup reports the missing folder
-      paths.game_data_root = chosen;
-      retry = true;
+    auto state = catherine::CheckGameFolder(paths.game_data_root);
+    if (std::getenv("CATH_FORCE_SETUP")) state = catherine::GameCheck::kMissing;  // testing
+    if (state == catherine::GameCheck::kOk || !drawer_) {
+      RememberGameFolder(paths.game_data_root);
+      return paths;
     }
-    if (catherine::LooksLikeGameFolder(paths.game_data_root)) {
-      std::string current = rex::cvar::GetFlagByName("game_data_root");
-      if (current != paths.game_data_root.string()) {
-        rex::cvar::SetFlagByName("game_data_root", paths.game_data_root.string());
-        if (!config_path_.empty()) rex::cvar::SaveConfig(config_path_);
-      }
+    setup_ = std::make_unique<catherine::SetupScreen>(
+        drawer_, paths.game_data_root, state,
+        [this, paths, resume](std::filesystem::path dir) {
+          // Continue startup outside the dialog's draw call.
+          window()->app_context().CallInUIThreadDeferred([this, paths, resume, dir]() {
+            setup_.reset();
+            rex::PathConfig p = paths;
+            p.game_data_root = dir;
+            RememberGameFolder(dir);
+            resume(p);
+          });
+        },
+        [this]() {
+          window()->app_context().CallInUIThreadDeferred([this]() {
+            setup_.reset();
+            if (window()) window()->RequestClose();
+          });
+        });
+    return std::nullopt;
+  }
+
+  void RememberGameFolder(const std::filesystem::path& dir) {
+    if (dir.empty()) return;
+    if (rex::cvar::GetFlagByName("game_data_root") != dir.string()) {
+      rex::cvar::SetFlagByName("game_data_root", dir.string());
+      if (!config_path_.empty()) rex::cvar::SaveConfig(config_path_);
     }
-    return paths;
   }
 
   // ------------------------------------------------------------ settings menu
@@ -151,10 +170,14 @@ class CatherineApp : public rex::ReXApp {
     if (menu_) menu_->SetFocusPaused(!focused);
   }
 
-  void OnShutdown() override { menu_.reset(); }
+  void OnShutdown() override {
+    setup_.reset();
+    menu_.reset();
+  }
 
  private:
   std::filesystem::path config_path_;
   rex::ui::ImGuiDrawer* drawer_ = nullptr;
   std::unique_ptr<catherine::SettingsMenu> menu_;
+  std::unique_ptr<catherine::SetupScreen> setup_;
 };

@@ -12,3 +12,5 @@ out/
 *.WORKING-*
 *.pre-*
 .DS_Store
+*.f32
+game-files/

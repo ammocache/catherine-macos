@@ -14,6 +14,7 @@ include(generated/rexglue.cmake)
 set(CATHERINE_SOURCES
     src/main.cpp
     src/settings_menu.cpp
+    src/setup_screen.cpp
 )
 
 if(WIN32)

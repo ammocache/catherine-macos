@@ -1,68 +1,93 @@
-# Catherine (Xbox 360) — native macOS recompilation
+<h1 align="center">✦ Catherine for macOS ✦</h1>
+<p align="center"><i>A native Apple Silicon recompilation of Catherine (Atlus, 2011, Xbox 360)</i></p>
 
-A static recompilation of *Catherine* (Atlus, 2011, Xbox 360) into a native
-Apple Silicon macOS app, built with the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk).
+---
 
-> **This repository contains no game code or game data.** You must own the game
-> and provide your own dump. The recompiled code is generated on your machine
-> from your copy during the build.
+> **No game code or game data is included here.** You need your own copy of
+> *Catherine* (USA, Xbox 360). The recompiled code is generated on **your** Mac,
+> from **your** files, when you run the setup.
 
-## Status
+This project uses the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) to
+statically recompile the Xbox 360 executable into a native ARM64 macOS app,
+with Xenos graphics translated to Metal (through Vulkan/MoltenVK).
 
-- Boots, menus, cutscenes and gameplay work (tested into the first stage).
-- Known issues: faint outlines around some menu text, HUD glitch bars,
-  audio stutter, fullscreen mode is broken (windowed is the default).
+## What you get
+
+- **Catherine.app** — a normal Mac app, built on your machine.
+- **A settings menu in the game's style** (press **Esc**, or **Back + Start** on
+  a controller): display mode, window size, render resolution (up to 2160p),
+  V-Sync, upscaling filter, audio options, controls, pause behaviour and more.
+  The game pauses while it's open.
+- **Fixes on top of the SDK**, including the black screen at gameplay start,
+  keyboard support for in-game dialogs, a working pause, and much cleaner audio
+  (removes decoder crackles and dropouts).
+- Keyboard & mouse or any controller macOS supports.
 
 ## Requirements
 
-- Apple Silicon Mac, macOS 15+
-- Homebrew, CMake, Ninja, LLVM/clang
-- The ReXGlue SDK v0.10.0 (commit `c94f5eb`) checked out at `../tools/rexglue-sdk`
-- Your own extracted retail **Catherine (USA)** Xbox 360 game folder
-  (containing `default.xex`), placed at `../retail-game`
+- An Apple Silicon Mac (M1 or newer), macOS 15 or later
+- About 15 GB of free space
+- [Homebrew](https://brew.sh) and Apple's Command Line Tools (setup offers to install what's missing)
+- Your own extracted **Catherine (USA)** Xbox 360 game folder, containing `default.xex`
+  (only this exact release is supported; setup checks it)
 
-Expected layout:
+## Install
 
-```
-catherine-project/
-├── rex-retail/          <- this repository
-├── retail-game/         <- your game files (default.xex, Data/, ...)
-└── tools/rexglue-sdk/   <- ReXGlue SDK
-```
-
-## Build
-
-```
-scripts/apply_sdk_patches.sh   # once, applies our SDK fixes from patches/
-scripts/build.sh               # configures (first time), recompiles and builds
+```sh
+git clone <this repository> catherine-project/rex-retail
+cd catherine-project/rex-retail
+./setup.sh
 ```
 
-## Play
+`setup.sh` walks you through everything: it checks your Mac, downloads the
+ReXGlue SDK (v0.10.0) and applies this project's fixes, asks for your game
+folder and verifies it, recompiles the game (20–40 minutes the first time) and
+offers to put **Catherine.app** in your Applications folder.
 
-```
-scripts/play.sh
-```
+Options: `./setup.sh --game /path/to/game/folder --yes` runs without questions.
 
-Default controls (keyboard): WASD = left stick, arrows = right stick,
-Space = A, Backspace = B, L = X, P = Y, Return = Start, Tab = Back.
-In-game overlays (hold fn on Mac keyboards): F3 performance, F4 settings,
-F7 achievements, ` console. Settings are saved to `catherine.toml` next to the
-executable.
+If you move your game files later, Catherine shows a setup screen at launch and
+lets you pick the new folder.
 
-## SDK patches
+## Playing
 
-| Patch | Purpose |
-|---|---|
-| `0001-unclipped-draw-extent-default-on.patch` | Fixes the black screen when gameplay starts (EDRAM ownership of full-screen clears). Also set as an app default in `src/catherine_app.h`. |
-| `0002-debug-env-switches-sampler-centroid.patch` | Debug-only switches (`CATH_SAMPLER_DBG`, `CATH_CENTROID` environment variables); no effect unless set. |
+| | Keyboard | Controller |
+|---|---|---|
+| Settings menu | Esc | Back + Start |
+| Move | W A S D | Left stick |
+| Camera | Arrow keys | Right stick |
+| Confirm / Back | Space / Backspace | A / B |
+| Pause (in game) | Enter or X | Start |
 
-## Legal
+Settings are saved in `~/Library/Application Support/Catherine/catherine.toml`.
 
-Catherine is © Atlus / SEGA. This project is not affiliated with or endorsed by
-them. It distributes only original code and configuration; it does not
-distribute any part of the game.
+## Status
 
-## Credits
+Playable: boots, menus, cutscenes and gameplay work, at a steady 30 fps on a
+base M4 at the original 720p.
 
-ReXGlue SDK, Xenia (graphics backend this SDK's GPU plugin derives from),
-MoltenVK, XenonRecomp / XenonAnalyse (hedge-dev).
+Known issues:
+- Switching display mode or window size applies after a restart
+  (the menu has a *Restart Now* button).
+- Higher render resolutions are GPU-heavy (2x runs ~18–20 fps on a base M4).
+- Faint outlines around some menu text, occasional HUD glitch bars.
+- A little low-frequency audio roughness can remain.
+
+## How it works
+
+1. The ReXGlue code generator translates the game's PowerPC code into C++
+   (`generated/`, created on your machine and never committed).
+2. That code is compiled together with the ReXGlue runtime (kernel, audio,
+   input, and the Xenos→Vulkan graphics backend) into a native app.
+3. `patches/` holds this project's fixes to the SDK; `src/` holds the app
+   (settings menu, setup screen, defaults).
+
+## Credits & licenses
+
+- [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (BSD 3-Clause), which builds on [Xenia](https://xenia.jp).
+- Fonts: Permanent Marker (Apache 2.0), Kalam, Poppins, Nunito (SIL OFL 1.1) — see `assets/fonts/`.
+- See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+*Catherine* is © ATLUS / SEGA. This is an unofficial fan project, not affiliated
+with or endorsed by Atlus or SEGA. It does not include or distribute any of
+their code, art, audio or other assets.
