@@ -64,14 +64,35 @@ Settings are saved in `~/Library/Application Support/Catherine/catherine.toml`.
 ## Status
 
 Playable: boots, menus, cutscenes and gameplay work, at a steady 30 fps on a
-base M4 at the original 720p.
+base M4 MacBook Pro (16 GB, macOS 15) at the original 720p. That is the only
+hardware it has been tested on so far.
+
+**Why 30 fps, and why not 60?** V1 targets a stable, V-Sync-locked 30 fps, the
+speed the game was made for. Unlocking the frame rate is not just a setting: the
+game's logic is expected to be tied to 30 fps timing (this is how many 360
+games work, and is not yet verified in detail for Catherine), so 60 fps would
+need game-logic fixes, as other recompilation projects have had to do.
 
 Known issues:
 - Switching display mode or window size applies after a restart
   (the menu has a *Restart Now* button).
-- Higher render resolutions are GPU-heavy (2x runs ~18–20 fps on a base M4).
+- Higher render resolutions are GPU-heavy: 2x runs ~20 fps on a base M4. The
+  cost comes from how the Xbox 360's EDRAM is emulated (many small render
+  passes per frame), not from the shaders; details in
+  [docs/PERFORMANCE_NOTES.md](docs/PERFORMANCE_NOTES.md).
 - Faint outlines around some menu text, occasional HUD glitch bars.
 - A little low-frequency audio roughness can remain.
+
+## Roadmap
+
+- Cut the cost of the emulated render-target passes so 2x runs at a stable 30 fps.
+- Investigate a ground-up native renderer (no EDRAM emulation, Xenos shaders
+  converted ahead of time, as in Unleashed Recompiled's
+  [XenosRecomp](https://github.com/hedge-dev/XenosRecomp)) for higher
+  resolutions. This is exploratory and a large amount of work; there is no
+  promise or date for it.
+- Game-logic fixes for frame rates above 30 fps.
+- More menu polish (FPS counter, volume slider, key remapping, popup styling).
 
 ## How it works
 
