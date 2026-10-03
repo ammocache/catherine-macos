@@ -39,7 +39,7 @@ with Xenos graphics translated to Metal (through Vulkan/MoltenVK).
 ## Requirements
 
 - An Apple Silicon Mac (M1 or newer), macOS 15 or later
-- About 15 GB of free space
+- About 5 GB of free space
 - [Homebrew](https://brew.sh) and Apple's Command Line Tools (setup offers to install what's missing)
 - Your own extracted **Catherine (USA)** Xbox 360 game folder, containing `default.xex`
   (only this exact release is supported; setup checks it)
@@ -54,7 +54,7 @@ cd catherine-project/rex-retail
 
 `setup.sh` walks you through everything: it checks your Mac, downloads the
 ReXGlue SDK (v0.10.0) and applies this project's fixes, asks for your game
-folder and verifies it, recompiles the game (20–40 minutes the first time) and
+folder and verifies it, recompiles the game (about 10 minutes on an M4 MacBook Pro, longer on older Macs) and
 offers to put **Catherine.app** in your Applications folder.
 
 Options: `./setup.sh --game /path/to/game/folder --yes` runs without questions.

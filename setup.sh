@@ -80,7 +80,7 @@ step "Checking your Mac"
 [[ $(uname -m) == arm64 ]] || die "An Apple Silicon Mac (M1 or newer) is required."
 ok "Apple Silicon, macOS $(sw_vers -productVersion)"
 avail_gb=$(df -g $REPO | awk 'NR==2 {print $4}')
-(( avail_gb >= 20 )) || warn "Only ${avail_gb} GB free; the build needs about 15 GB."
+(( avail_gb >= 8 )) || warn "Only ${avail_gb} GB free; the build needs about 5 GB."
 
 if ! xcode-select -p >/dev/null 2>&1; then
   warn "Apple's Command Line Tools (compiler) are missing."
@@ -171,7 +171,7 @@ ok "Game folder: $game"
 
 # ----------------------------------------------------------- 4. build --
 step "Building Catherine"
-info "Recompiling the game for Apple Silicon. The first build takes a while (20-40 min)."
+info "Recompiling the game for Apple Silicon. The first build takes a while (about 10 min on an M4; longer on older Macs)."
 caffeinate -i true 2>/dev/null
 run_logged "Recompiling and building" env REXSDK_DIR=$SDK_DIR caffeinate -i $REPO/scripts/build.sh \
   || die "The build failed." "The last lines of $LOG usually say why."
