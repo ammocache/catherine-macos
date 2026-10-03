@@ -6,6 +6,14 @@ cd "$REPO" || exit 1
 if [ ! -d out/build/mac-arm64-release ]; then
   cmake --preset mac-arm64-release -DREXSDK_DIR="$SDK" -DREXGLUE_ROOT="$SDK" || exit 1
 fi
+# First build on a fresh checkout: the recompiled code doesn't exist yet, and
+# CMake only picks up the generated source list when it configures. Generate it
+# first, then re-configure so the generated files are part of the build.
+if [ ! -f generated/default/sources.cmake ]; then
+  echo "Generating recompiled code from your default.xex (first build only)..."
+  caffeinate -i cmake --build --preset mac-arm64-release --target catherine_codegen -j 6 || exit 1
+  cmake --preset mac-arm64-release -DREXSDK_DIR="$SDK" -DREXGLUE_ROOT="$SDK" > /dev/null || exit 1
+fi
 caffeinate -i cmake --build --preset mac-arm64-release --target catherine -j 6 || exit 1
 D=out/build/mac-arm64-release
 # The GPU plugin is built inside the SDK; copy it next to the game and re-sign it

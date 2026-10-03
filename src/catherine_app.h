@@ -90,6 +90,7 @@ class CatherineApp : public rex::ReXApp {
   // files, or a different version of the game).
   std::optional<rex::PathConfig> OnFinalizePaths(
       const rex::PathConfig& defaults, std::function<void(rex::PathConfig)> resume) override {
+    if (window()) window()->SetTitle("Catherine");
     rex::PathConfig paths = defaults;
     if (catherine::CheckGameFolder(paths.game_data_root) == catherine::GameCheck::kMissing) {
       // The SDK reads the folder before the config file is loaded; use the
@@ -149,6 +150,7 @@ class CatherineApp : public rex::ReXApp {
     // added during overlay setup are not picked up by the presenter.
     if (!window()) return;
     window()->app_context().CallInUIThreadDeferred([this]() {
+      if (window()) window()->SetTitle("Catherine");
       if (menu_ || !drawer_) return;
       catherine::SettingsMenu::Callbacks cb;
       cb.close_game = [this]() {

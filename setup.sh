@@ -61,7 +61,7 @@ run_logged() { # run_logged "label" cmd... (shows a spinner, output goes to the 
   print -n -- "   ${BLUSH}$label${R} "
   ( "$@" ) >> $LOG 2>&1 &
   local pid=$! frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏') i=0 start=$SECONDS
-  while kill -0 $pid 2>/dev/null; do
+  while [[ -t 1 ]] && kill -0 $pid 2>/dev/null; do
     print -n -- "\r   ${BLUSH}$label${R} ${PINK}${frames[i % 10 + 1]}${R} ${GREY}$((SECONDS-start))s${R}"
     i=$((i+1)); sleep 0.2
   done
