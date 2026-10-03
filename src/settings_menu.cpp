@@ -372,9 +372,12 @@ void SettingsMenu::BuildCategories() {
         {"Extra Smooth (170 ms)", {{"audio_maxqframes", "32"}}}},
        true, nullptr, ""});
   audio.rows.push_back({RowKind::kChoice, "Remove Crackles",
-                        "Smooths sudden jumps between pieces of decoded audio, which are "
-                        "heard as clicks or crackles. Does not change normal sound.",
-                        onoff("audio_declick"), false, nullptr, ""});
+                        "Smooths sudden jumps between pieces of decoded audio and fills tiny "
+                        "dropouts, which are heard as clicks, crackles or quick pauses. Does "
+                        "not change normal sound.",
+                        {{"On", {{"audio_declick", "true"}, {"audio_fill_dropouts", "true"}}},
+                         {"Off", {{"audio_declick", "false"}, {"audio_fill_dropouts", "false"}}}},
+                        false, nullptr, ""});
   audio.rows.push_back({RowKind::kChoice, "Smooth Audio Gaps",
                         "If sound arrives late, fade it out and back in instead of cutting "
                         "to silence. Removes the clicking sound.",

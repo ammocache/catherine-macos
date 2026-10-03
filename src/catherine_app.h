@@ -9,11 +9,14 @@
 #include <rex/ui/keybinds.h>
 #include <rex/ui/window.h>
 
+#include "game_folder.h"
 #include "relaunch.h"
 #include "settings_menu.h"
 
 #include <cstdlib>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -80,6 +83,34 @@ class CatherineApp : public rex::ReXApp {
         }
       }
     }
+  }
+
+  // Game folder: command line > saved setting > ask the player (first run).
+  std::optional<rex::PathConfig> OnFinalizePaths(
+      const rex::PathConfig& defaults, std::function<void(rex::PathConfig)> resume) override {
+    (void)resume;
+    rex::PathConfig paths = defaults;
+    if (!catherine::LooksLikeGameFolder(paths.game_data_root)) {
+      // The SDK reads the folder before the config file is loaded; use the
+      // saved value now that it is.
+      std::string saved = rex::cvar::GetFlagByName("game_data_root");
+      if (catherine::LooksLikeGameFolder(saved)) paths.game_data_root = saved;
+    }
+    bool retry = false;
+    while (!catherine::LooksLikeGameFolder(paths.game_data_root)) {
+      auto chosen = catherine::AskForGameFolder(retry);
+      if (chosen.empty()) break;  // cancelled: startup reports the missing folder
+      paths.game_data_root = chosen;
+      retry = true;
+    }
+    if (catherine::LooksLikeGameFolder(paths.game_data_root)) {
+      std::string current = rex::cvar::GetFlagByName("game_data_root");
+      if (current != paths.game_data_root.string()) {
+        rex::cvar::SetFlagByName("game_data_root", paths.game_data_root.string());
+        if (!config_path_.empty()) rex::cvar::SaveConfig(config_path_);
+      }
+    }
+    return paths;
   }
 
   // ------------------------------------------------------------ settings menu
