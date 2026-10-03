@@ -23,6 +23,19 @@ with Xenos graphics translated to Metal (through Vulkan/MoltenVK).
   (removes decoder crackles and dropouts).
 - Keyboard & mouse or any controller macOS supports.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/images/gameplay.gif" width="100%" alt="Gameplay, shown at 3x speed"><br><sub>Gameplay (shown at 3&times; speed)</sub></td>
+    <td align="center" width="50%"><img src="docs/images/cutscene.gif" width="100%" alt="A cutscene, shown at 2x speed"><br><sub>Cutscene (shown at 2&times; speed)</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><img src="docs/images/setup-screen.png" width="100%" alt="First-run setup screen"><br><sub>First-run setup screen</sub></td>
+    <td align="center" width="50%"><img src="docs/images/settings-menu.png" width="100%" alt="Settings menu"><br><sub>Settings menu (press Esc)</sub></td>
+  </tr>
+</table>
+
 ## Requirements
 
 - An Apple Silicon Mac (M1 or newer), macOS 15 or later
@@ -107,7 +120,7 @@ Known issues:
 
 This project's own code (settings menu, setup screen, scripts, patches) is
 released under the [MIT License](LICENSE). The license does not cover the game
-or the icon and banner artwork, which use ATLUS / SEGA material.
+or the icon, banner, screenshots and clips, which use ATLUS / SEGA material.
 
 - [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (BSD 3-Clause), which builds on [Xenia](https://xenia.jp).
 - Fonts: Permanent Marker (Apache 2.0), Kalam, Poppins, Nunito (SIL OFL 1.1) — see `assets/fonts/`.
@@ -115,6 +128,8 @@ or the icon and banner artwork, which use ATLUS / SEGA material.
   here as a fan-project icon only. It is not covered by this project's license.
 - Banner: made by the project author using artwork from *Catherine*, © ATLUS / SEGA, used
   here as fan-project artwork only. It is not covered by this project's license.
+- Screenshots and clips: captured from this project running on a Mac; the game's visuals are
+  © ATLUS / SEGA, shown here to illustrate the fan project. Not covered by this project's license.
 - See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 *Catherine* is © ATLUS / SEGA. This is an unofficial fan project, not affiliated
