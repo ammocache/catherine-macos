@@ -363,6 +363,22 @@ void SettingsMenu::BuildCategories() {
   audio.rows.push_back({RowKind::kChoice, "Game Audio", "Mute or unmute all game sound.",
                         {{"On", {{"audio_mute", "false"}}}, {"Muted", {{"audio_mute", "true"}}}},
                         false, nullptr, ""});
+  audio.rows.push_back(
+      {RowKind::kChoice, "Audio Buffer",
+       "How much sound is prepared ahead of time. Bigger buffers stop crackles and "
+       "clicks when the game hitches, at the cost of a tiny delay.",
+       {{"Normal (43 ms)", {{"audio_maxqframes", "8"}}},
+        {"Smooth (85 ms)", {{"audio_maxqframes", "16"}}},
+        {"Extra Smooth (170 ms)", {{"audio_maxqframes", "32"}}}},
+       true, nullptr, ""});
+  audio.rows.push_back({RowKind::kChoice, "Remove Crackles",
+                        "Smooths sudden jumps between pieces of decoded audio, which are "
+                        "heard as clicks or crackles. Does not change normal sound.",
+                        onoff("audio_declick"), false, nullptr, ""});
+  audio.rows.push_back({RowKind::kChoice, "Smooth Audio Gaps",
+                        "If sound arrives late, fade it out and back in instead of cutting "
+                        "to silence. Removes the clicking sound.",
+                        onoff("audio_smooth_gaps"), false, nullptr, ""});
   cats_.push_back(std::move(audio));
 
   Category controls{"Controls", "Keyboard, mouse and controller settings.", {}};

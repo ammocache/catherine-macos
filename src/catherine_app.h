@@ -60,6 +60,9 @@ class CatherineApp : public rex::ReXApp {
         // Runtime window resizes currently break presentation (flat color), so
         // the window size is fixed; size/fullscreen apply on restart instead.
         {"window_resizable", "false"},
+        // Audio: 85 ms of buffered sound rides out short hitches (see the
+        // underrun/declick work in patch 0007).
+        {"audio_maxqframes", "16"},
         // Keyboard and mouse controls.
         {"mnk_mode", "true"},
         // Start windowed at 720p (fullscreen can be enabled in the settings menu).

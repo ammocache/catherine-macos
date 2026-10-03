@@ -1,0 +1,220 @@
+diff --git a/include/rex/audio/sdl/sdl_audio_driver.h b/include/rex/audio/sdl/sdl_audio_driver.h
+index f8949ca..1351299 100644
+--- a/include/rex/audio/sdl/sdl_audio_driver.h
++++ b/include/rex/audio/sdl/sdl_audio_driver.h
+@@ -20,6 +20,10 @@
+ 
+ #include <SDL3/SDL.h>
+ 
++#include <cstdint>
++#include <cstdio>
++#include <vector>
++
+ namespace rex::audio::sdl {
+ 
+ class SDLAudioDriver : public AudioDriver {
+@@ -49,6 +53,21 @@ class SDLAudioDriver : public AudioDriver {
+   std::queue<float*> frames_queued_ = {};
+   std::stack<float*> frames_unused_ = {};
+   std::mutex frames_mutex_ = {};
++
++  // Catherine: underrun concealment (fade instead of hard silence) and
++  // re-buffering after an underrun, plus statistics for diagnosing clicks.
++  std::vector<float> last_output_;   // last interleaved chunk sent to SDL
++  bool rebuffering_ = true;          // waiting for the queue to refill
++  bool faded_out_ = true;            // last chunk ended in silence
++  uint64_t underruns_ = 0;           // times the queue ran dry while playing
++  uint64_t declicks_ = 0;            // frame-boundary jumps smoothed
++  uint64_t stats_chunks_ = 0;
++  size_t stats_min_queue_ = SIZE_MAX;
++  uint64_t stats_last_tick_ = 0;
++  bool dump_opened_ = false;
++  FILE* dump_ = nullptr;
++  FILE* dump_marks_ = nullptr;
++  uint64_t dump_chunk_ = 0;
+ };
+ 
+ }  // namespace rex::audio::sdl
+diff --git a/src/audio/sdl/sdl_audio_driver.cpp b/src/audio/sdl/sdl_audio_driver.cpp
+index 20a2cd8..7d22db1 100644
+--- a/src/audio/sdl/sdl_audio_driver.cpp
++++ b/src/audio/sdl/sdl_audio_driver.cpp
+@@ -9,6 +9,11 @@
+  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+  */
+ 
++#include <atomic>
++#include <cmath>
++#include <cstdio>
++#include <cstdlib>
++#include <string>
+ #include <algorithm>
+ #include <array>
+ #include <cstring>
+@@ -18,6 +23,7 @@
+ #include <rex/audio/downmix.h>
+ #include <rex/audio/flags.h>
+ #include <rex/audio/sdl/sdl_audio_driver.h>
++#include <rex/chrono/clock.h>
+ #include <rex/cvar.h>
+ #include <rex/dbg.h>
+ #include <rex/logging.h>
+@@ -25,6 +31,16 @@
+ #include <SDL3/SDL.h>
+ 
+ REXCVAR_DEFINE_BOOL(audio_mute, false, "Audio", "Mute audio output");
++REXCVAR_DEFINE_BOOL(audio_smooth_gaps, true, "Audio",
++                    "Fade out/in around audio buffer underruns instead of cutting to silence "
++                    "(removes clicks)");
++REXCVAR_DEFINE_INT32(audio_rebuffer_frames, 3, "Audio",
++                     "After an underrun, wait for this many audio frames before resuming "
++                     "playback (0 = resume immediately)");
++REXCVAR_DEFINE_BOOL(audio_declick, true, "Audio",
++                    "Smooth sudden jumps between audio frames (removes crackles caused by "
++                    "decoding discontinuities)");
++REXCVAR_DECLARE(int32_t, audio_maxqframes);
+ 
+ namespace rex::audio::sdl {
+ 
+@@ -178,15 +194,64 @@ void SDLAudioDriver::SDLCallback(void* userdata, SDL_AudioStream* stream, int ad
+   const StereoFold fold = GetStereoFold();
+   const SurroundMix mix = GetSurroundMix();
+   const float gain = GetOutputGain();
++  const bool smooth = REXCVAR_GET(audio_smooth_gaps);
++  const size_t rebuffer_target = static_cast<size_t>(std::clamp<int32_t>(
++      REXCVAR_GET(audio_rebuffer_frames), 0, std::max<int32_t>(1, REXCVAR_GET(audio_maxqframes) - 1)));
++  if (driver->last_output_.size() != size_t(sample_count)) {
++    driver->last_output_.assign(size_t(sample_count), 0.0f);
++    driver->faded_out_ = true;
++  }
++  const int channels = std::max<int>(driver->sdl_device_channels_, 1);
++  // Optional raw output dump for click analysis (env CATH_AUDIO_DUMP=path);
++  // one file per audio stream: <path>.<n>.f32 with a 1-line header file.
++  if (!driver->dump_opened_) {
++    driver->dump_opened_ = true;
++    if (const char* p = std::getenv("CATH_AUDIO_DUMP")) {
++      static std::atomic<int> next_id{0};
++      int id = next_id++;
++      std::string base = std::string(p) + "." + std::to_string(id);
++      driver->dump_ = std::fopen((base + ".f32").c_str(), "wb");
++      driver->dump_marks_ = std::fopen((base + ".marks").c_str(), "w");
++      if (driver->dump_marks_) std::fprintf(driver->dump_marks_, "channels %d\n", channels);
++    }
++  }
++  FILE* dump = driver->dump_;
++  FILE* dump_marks = driver->dump_marks_;
++  uint64_t& dump_chunk = driver->dump_chunk_;
+   while (additional_amount > 0) {
+-    static uint32_t sdl_callback_count = 0;
+     std::unique_lock<std::mutex> guard(driver->frames_mutex_);
+-    if (driver->frames_queued_.empty()) {
+-      if (sdl_callback_count < 10) {
+-        REXAPU_DEBUG("SDLCallback: no frames queued (silence)");
+-        sdl_callback_count++;
++    const size_t queued = driver->frames_queued_.size();
++    driver->stats_min_queue_ = std::min(driver->stats_min_queue_, queued);
++    driver->stats_chunks_++;
++
++    // Re-buffering: after running dry, wait until a few frames are ready so a
++    // single late frame does not turn into rapid on/off stutter.
++    if (driver->rebuffering_ && queued > 0 && queued >= std::max<size_t>(rebuffer_target, 1)) {
++      driver->rebuffering_ = false;
++    }
++    if (driver->rebuffering_ || queued == 0) {
++      if (!driver->rebuffering_) {
++        // Queue ran dry while playing: this is what used to click.
++        driver->rebuffering_ = rebuffer_target > 0;
++        driver->underruns_++;
++      }
++      if (smooth && !driver->faded_out_) {
++        // Fade the previous chunk out to silence instead of cutting it off.
++        for (uint32_t i = 0; i < channel_samples_; ++i) {
++          float g = 1.0f - float(i + 1) / float(channel_samples_);
++          for (int c = 0; c < channels; ++c) {
++            data[i * channels + c] = driver->last_output_[i * channels + c] * g;
++          }
++        }
++      } else {
++        std::memset(data, 0, len);
++      }
++      driver->faded_out_ = true;
++      if (dump) {
++        std::fwrite(data, 1, size_t(len), dump);
++        if (dump_marks) std::fprintf(dump_marks, "%llu gap\n", (unsigned long long)dump_chunk);
++        dump_chunk++;
+       }
+-      std::memset(data, 0, len);
+       if (!SDL_PutAudioStreamData(stream, data, len)) {
+         REXAPU_ERROR("SDL_PutAudioStreamData() failed while filling silence: {}", SDL_GetError());
+         break;
+@@ -212,6 +277,45 @@ void SDLAudioDriver::SDLCallback(void* userdata, SDL_AudioStream* stream, int ad
+             break;
+         }
+       }
++      if (REXCVAR_GET(audio_declick) && !driver->faded_out_) {
++        // Declicker: if this frame starts with a jump bigger than any step
++        // inside the frame (a decoding discontinuity, heard as a click),
++        // bend the first ~1.3 ms smoothly from where the previous frame was
++        // heading to where this one goes.
++        constexpr uint32_t kRamp = 64;
++        const float* prev = driver->last_output_.data();
++        const uint32_t last = channel_samples_ - 1;
++        for (int c = 0; c < channels; ++c) {
++          float p1 = prev[last * channels + c];
++          float p0 = prev[(last - 1) * channels + c];
++          float predicted = p1 + (p1 - p0);
++          float step = data[c] - predicted;
++          float inner = 0.0f;
++          for (uint32_t i = 1; i < channel_samples_; ++i) {
++            inner = std::max(inner, std::fabs(data[i * channels + c] - data[(i - 1) * channels + c]));
++          }
++          if (std::fabs(step) > 0.01f && std::fabs(step) > 1.5f * inner) {
++            for (uint32_t i = 0; i < kRamp; ++i) {
++              float w = 0.5f * (1.0f + std::cos(3.14159265f * float(i) / float(kRamp)));
++              data[i * channels + c] -= step * w;
++            }
++            driver->declicks_++;
++          }
++        }
++      }
++      if (smooth && driver->faded_out_) {
++        // Coming back from silence: fade in to avoid a click.
++        for (uint32_t i = 0; i < channel_samples_; ++i) {
++          float g = float(i + 1) / float(channel_samples_);
++          for (int c = 0; c < channels; ++c) data[i * channels + c] *= g;
++        }
++      }
++      driver->faded_out_ = false;
++      std::memcpy(driver->last_output_.data(), data, len);
++      if (dump) {
++        std::fwrite(data, 1, size_t(len), dump);
++        dump_chunk++;
++      }
+       if (!SDL_PutAudioStreamData(stream, data, len)) {
+         REXAPU_ERROR("SDL_PutAudioStreamData() failed: {}", SDL_GetError());
+         driver->frames_unused_.push(buffer);
+@@ -224,6 +328,24 @@ void SDLAudioDriver::SDLCallback(void* userdata, SDL_AudioStream* stream, int ad
+       additional_amount -= len;
+     }
+   }
++  {
++    // Optional statistics (env CATH_FPS_LOG=1), every ~2 seconds.
++    static const bool log_stats = std::getenv("CATH_FPS_LOG") != nullptr;
++    if (log_stats) {
++      uint64_t now = rex::chrono::Clock::QueryHostTickCount();
++      uint64_t freq = rex::chrono::Clock::QueryHostTickFrequency();
++      if (!driver->stats_last_tick_) driver->stats_last_tick_ = now;
++      if (now - driver->stats_last_tick_ >= freq * 2) {
++        REXLOG_ERROR("AUDIO_STATS underruns={} declicks={} min_queue={} chunks={}", driver->underruns_,
++                     driver->declicks_,
++                     driver->stats_min_queue_ == SIZE_MAX ? 0 : driver->stats_min_queue_,
++                     driver->stats_chunks_);
++        driver->stats_last_tick_ = now;
++        driver->stats_min_queue_ = SIZE_MAX;
++        driver->stats_chunks_ = 0;
++      }
++    }
++  }
+   SDL_stack_free(data);
+ }
+ 
