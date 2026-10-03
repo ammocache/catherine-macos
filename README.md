@@ -105,6 +105,10 @@ Known issues:
 
 ## Credits & licenses
 
+This project's own code (settings menu, setup screen, scripts, patches) is
+released under the [MIT License](LICENSE). The license does not cover the game
+or the app icon artwork, which belong to ATLUS / SEGA.
+
 - [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (BSD 3-Clause), which builds on [Xenia](https://xenia.jp).
 - Fonts: Permanent Marker (Apache 2.0), Kalam, Poppins, Nunito (SIL OFL 1.1) — see `assets/fonts/`.
 - App icon: an image of the curtain block from *Catherine*, © ATLUS / SEGA, used
