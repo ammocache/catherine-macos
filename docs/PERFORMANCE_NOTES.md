@@ -38,3 +38,12 @@ SAVEPOINTS/gpu-experiments-2026-10-03.patch, not in the release):
 
 Next real options: (1) reduce multisampled depth transfer cost (batching into the guest pass, compute-based copy,
 or avoiding MSAA host images), (2) native renderer without EDRAM emulation (Skate 3 / Unleashed approach).
+
+### Follow-up (idle machine, 3 runs each, 2x, vsync off)
+- baseline 20.0 / 19.9 / 19.9; skip all ownership transfers 20.1 / 20.1 / 23.4;
+  skip the depth *store* in transfer+clear passes together 26.6 / 30.6 / 30.8;
+  skip it in only the transfer passes 20.3 / 20.2; only the clear passes 20.6 / 20.3.
+- Neither removing the transfers nor removing the stores in one kind of pass helps; only removing the stores in
+  both the transfer and the resolve-clear passes does. That points at the chain of dependent passes on the same
+  multisampled depth image (store -> load -> store) rather than bandwidth or draw cost. The structural fix is to
+  merge transfers/clears into fewer passes (the upstream TODO at render_target_cache.cpp:~4804), not to drop work.
