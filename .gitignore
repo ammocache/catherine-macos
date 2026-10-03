@@ -14,3 +14,5 @@ out/
 .DS_Store
 *.f32
 game-files/
+# Personal files (e.g. an app icon made from official artwork) - never published.
+local-assets/
