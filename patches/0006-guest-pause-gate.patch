@@ -1,0 +1,76 @@
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_video.cpp b/src/kernel/xboxkrnl/xboxkrnl_video.cpp
+index 1254710..b8cd4c6 100644
+--- a/src/kernel/xboxkrnl/xboxkrnl_video.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_video.cpp
+@@ -14,6 +14,8 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <condition_variable>
++#include <mutex>
+ #include <string>
+ 
+ #include <rex/cvar.h>
+@@ -29,10 +31,34 @@
+ #include <rex/types.h>
+ #include <rex/runtime.h>
+ #include <rex/system/export_resolver.h>
++#include <rex/system/guest_pause.h>
+ #include <rex/system/kernel_state.h>
+ #include <rex/system/xtypes.h>
+ #include <rex/ui/flags.h>
+ 
++namespace rex::system {
++namespace {
++std::mutex g_pause_mutex;
++std::condition_variable g_pause_cv;
++bool g_paused = false;
++}  // namespace
++void SetGuestPaused(bool paused) {
++  {
++    std::lock_guard<std::mutex> lock(g_pause_mutex);
++    g_paused = paused;
++  }
++  g_pause_cv.notify_all();
++}
++bool IsGuestPaused() {
++  std::lock_guard<std::mutex> lock(g_pause_mutex);
++  return g_paused;
++}
++void WaitWhileGuestPaused() {
++  std::unique_lock<std::mutex> lock(g_pause_mutex);
++  g_pause_cv.wait(lock, [] { return !g_paused; });
++}
++}  // namespace rex::system
++
+ namespace {
+ // Display gamma type: 0 - linear, 1 - sRGB (CRT), 2 - BT.709 (HDTV), 3 - power
+ constexpr uint32_t kDisplayGammaType = 2;
+@@ -445,6 +471,8 @@ void VdSwap_entry(mapped_void buffer_ptr,      // ptr into primary ringbuffer
+                   mapped_u32 frontbuffer_ptr,  // ptr to frontbuffer address
+                   mapped_u32 texture_format_ptr, mapped_u32 color_space_ptr, mapped_u32 width,
+                   mapped_u32 height) {
++  // Catherine: settings menu pause gate (blocks the game's frame loop).
++  rex::system::WaitWhileGuestPaused();
+   // All of these parameters are REQUIRED.
+   assert(buffer_ptr);
+   assert(fetch_ptr);
+diff --git a/include/rex/system/guest_pause.h b/include/rex/system/guest_pause.h
+new file mode 100644
+index 0000000..eb26afc
+--- /dev/null
++++ b/include/rex/system/guest_pause.h
+@@ -0,0 +1,13 @@
++// Catherine addition: cooperative "pause the game" gate.
++// While paused, the guest blocks at its next VdSwap (once per frame), which
++// stops the game loop without freezing host threads mid-work.
++#pragma once
++
++namespace rex::system {
++
++void SetGuestPaused(bool paused);
++bool IsGuestPaused();
++// Called by the guest's per-frame path; blocks while paused.
++void WaitWhileGuestPaused();
++
++}  // namespace rex::system

@@ -1,0 +1,27 @@
+diff --git a/src/ui/window_sdl.cpp b/src/ui/window_sdl.cpp
+index 2251429..e1b2f1c 100644
+--- a/src/ui/window_sdl.cpp
++++ b/src/ui/window_sdl.cpp
+@@ -40,6 +40,10 @@
+ #include <rex/ui/surface_gnulinux.h>
+ #endif
+ 
++// Catherine: allow disabling user resizing (runtime resizes currently break the
++// Vulkan/MoltenVK presentation on macOS).
++REXCVAR_DEFINE_BOOL(window_resizable, true, "UI", "Allow the window to be resized by the user");
++
+ namespace rex::ui {
+ 
+ namespace {
+@@ -136,7 +140,10 @@ WindowSDL::~WindowSDL() {
+ bool WindowSDL::OpenImpl() {
+   // SDL window coordinates are physical pixels on Windows and X11. Cocoa
+   // uses logical points and applies the backing scale itself.
+-  SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
++  SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
++  if (REXCVAR_GET(window_resizable)) {
++    flags |= SDL_WINDOW_RESIZABLE;
++  }
+ #if REX_PLATFORM_MAC
+   int initial_width = int(GetDesiredLogicalWidth());
+   int initial_height = int(GetDesiredLogicalHeight());

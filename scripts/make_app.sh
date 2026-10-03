@@ -5,10 +5,13 @@ B=$REPO/out/build/mac-arm64-release
 APP=$REPO/out/Catherine.app
 [ -x "$B/catherine" ] || { echo "Build the game first (scripts/build.sh)"; exit 1; }
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+rm -rf "$APP/Contents/_CodeSignature"   # stale bundle seal would block launch
 cp "$B/catherine" "$B"/*.dylib "$APP/Contents/MacOS/"
-cp -R "$B/vulkan" "$APP/Contents/MacOS/"   # bundled MoltenVK + Vulkan loader
-# Keep the player's settings if the app already has them; otherwise start from the dev config.
-[ -f "$APP/Contents/MacOS/catherine.toml" ] || cp "$B/catherine.toml" "$APP/Contents/MacOS/" 2>/dev/null
+rm -rf "$APP/Contents/MacOS/vulkan" "$APP/Contents/Resources/vulkan"
+cp -R "$B/vulkan" "$APP/Contents/Resources/vulkan"   # bundled MoltenVK + Vulkan loader
+rm -rf "$APP/Contents/Resources/fonts"; cp -R "$REPO/assets/fonts" "$APP/Contents/Resources/fonts"
+# Settings live in ~/Library/Application Support/Catherine, never inside the app.
+rm -f "$APP/Contents/MacOS/catherine.toml"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -25,11 +28,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.games</string>
 </dict></plist>
 PLIST
-# Sign every library first, then the app itself (ad-hoc signature, fine for local use).
-for f in "$APP/Contents/MacOS"/*.dylib "$APP/Contents/MacOS/vulkan/lib"/*.dylib; do
+# Sign every library first, then the whole app (ad-hoc signature, fine for local use).
+for f in "$APP/Contents/MacOS"/*.dylib "$APP/Contents/Resources/vulkan/lib"/*.dylib; do
   codesign --force --sign - "$f" || { echo "codesign failed on $f"; exit 1; }
 done
-# (The bundle as a whole is left unsigned for local dev: the Vulkan data folder inside
-# Contents/MacOS blocks bundle signing. The executable keeps its linker signature.
-# TODO for release: move vulkan/ into Contents/Frameworks + Resources and sign the bundle.)
+codesign --force --sign - "$APP" || { echo "codesign failed on app"; exit 1; }
 echo "App ready: $APP"
