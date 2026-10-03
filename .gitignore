@@ -1,0 +1,14 @@
+# Never commit anything derived from the game.
+generated/*
+!generated/rexglue.cmake
+retail-game
+*.xex
+*.iso
+# Build output, logs, local backups.
+out/
+*.log
+*.bak*
+*.init
+*.WORKING-*
+*.pre-*
+.DS_Store

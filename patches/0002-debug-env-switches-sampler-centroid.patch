@@ -1,0 +1,65 @@
+diff --git a/src/graphics/vulkan/pipeline_cache.cpp b/src/graphics/vulkan/pipeline_cache.cpp
+index 91ac08f..8b226c6 100644
+--- a/src/graphics/vulkan/pipeline_cache.cpp
++++ b/src/graphics/vulkan/pipeline_cache.cpp
+@@ -9,6 +9,7 @@
+  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+  */
+ 
++#include <cstdlib>
+ #include <algorithm>
+ #include <array>
+ #include <atomic>
+@@ -975,6 +976,13 @@ SpirvShaderTranslator::Modification VulkanPipelineCache::GetCurrentPixelShaderMo
+                               regs.Get<reg::RB_SURFACE_INFO>().msaa_samples,
+                               regs.Get<reg::SQ_CONTEXT_MISC>().sc_sample_cntl,
+                               regs.Get<reg::SQ_INTERPOLATOR_CNTL>().sampling_pattern);
++  {
++    // Debug override (env CATH_CENTROID): 1 = force centroid on all interpolators, 2 = never.
++    static const int cath_centroid =
++        std::getenv("CATH_CENTROID") ? std::atoi(std::getenv("CATH_CENTROID")) : 0;
++    if (cath_centroid == 1) modification.pixel.interpolators_centroid = interpolator_mask;
++    if (cath_centroid == 2) modification.pixel.interpolators_centroid = 0;
++  }
+ 
+   if (param_gen_pos < xenos::kMaxInterpolators) {
+     modification.pixel.param_gen_enable = 1;
+diff --git a/src/graphics/vulkan/texture_cache.cpp b/src/graphics/vulkan/texture_cache.cpp
+index ecbd940..2a588d1 100644
+--- a/src/graphics/vulkan/texture_cache.cpp
++++ b/src/graphics/vulkan/texture_cache.cpp
+@@ -9,6 +9,7 @@
+  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+  */
+ 
++#include <cstdlib>
+ #include <algorithm>
+ #include <array>
+ #include <cstddef>
+@@ -755,6 +756,26 @@ VulkanTextureCache::SamplerParameters VulkanTextureCache::GetSamplerParameters(
+   }
+   parameters.aniso_filter = aniso_filter;
+ 
++  // Debug override (env CATH_SAMPLER_DBG): 1 = force clamp-to-edge, 2 = force point filtering,
++  // 4 = force clamp-to-edge only where the game asked for a border.
++  static const int cath_dbg = std::getenv("CATH_SAMPLER_DBG") ? std::atoi(std::getenv("CATH_SAMPLER_DBG")) : 0;
++  if (cath_dbg & 1) {
++    parameters.clamp_x = parameters.clamp_y = parameters.clamp_z = xenos::ClampMode::kClampToEdge;
++  }
++  if (cath_dbg & 4) {
++    if (xenos::ClampModeUsesBorder(parameters.clamp_x)) parameters.clamp_x = xenos::ClampMode::kClampToEdge;
++    if (xenos::ClampModeUsesBorder(parameters.clamp_y)) parameters.clamp_y = xenos::ClampMode::kClampToEdge;
++    if (xenos::ClampModeUsesBorder(parameters.clamp_z)) parameters.clamp_z = xenos::ClampMode::kClampToEdge;
++  }
++  if (cath_dbg & 2) {
++    parameters.mag_linear = false;
++    parameters.min_linear = false;
++  }
++  if (cath_dbg & 8) {
++    // Sample only the top (full-size) mip level.
++    parameters.mip_linear = false;
++    parameters.mip_base_map = true;
++  }
+   return parameters;
+ }
+ 
