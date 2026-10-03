@@ -7,6 +7,7 @@
 #include <rex/cvar.h>
 #include <rex/rex_app.h>
 
+#include <cstdlib>
 #include <string_view>
 #include <utility>
 
@@ -26,6 +27,9 @@ class CatherineApp : public rex::ReXApp {
   // and command line always win.
   void OnConfigurePaths(rex::PathConfig& paths) override {
     (void)paths;
+    // macOS Spaces-style fullscreen shows a flat color with this renderer;
+    // use classic (non-Spaces) fullscreen instead.
+    setenv("SDL_VIDEO_MAC_FULLSCREEN_SPACES", "0", 0);
     static constexpr std::pair<std::string_view, std::string_view> kDefaults[] = {
         // Graphics plugin (Xenia-derived Vulkan backend via MoltenVK).
         {"gpu_plugin", "xenos"},

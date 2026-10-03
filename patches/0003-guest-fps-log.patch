@@ -1,0 +1,38 @@
+diff --git a/src/graphics/command_processor.cpp b/src/graphics/command_processor.cpp
+index a744375..2ccc8a2 100644
+--- a/src/graphics/command_processor.cpp
++++ b/src/graphics/command_processor.cpp
+@@ -9,6 +9,7 @@
+  * @modified    Tom Clay, 2026 - Adapted for ReXGlue runtime
+  */
+ 
++#include <cstdlib>
+ #include <algorithm>
+ #include <cinttypes>
+ #include <cmath>
+@@ -945,6 +946,25 @@ bool CommandProcessor::ExecutePacketType3_XE_SWAP(memory::RingBuffer* reader, ui
+ #endif
+   rex::perf::Profiler::Flip();
+ 
++  // Catherine: optional guest FPS logging (set env CATH_FPS_LOG=1).
++  {
++    static const bool fps_log = std::getenv("CATH_FPS_LOG") != nullptr;
++    if (fps_log) {
++      static uint64_t window_start = 0;
++      static uint32_t window_frames = 0;
++      uint64_t now = rex::chrono::Clock::QueryHostTickCount();
++      uint64_t freq = rex::chrono::Clock::QueryHostTickFrequency();
++      if (!window_start) window_start = now;
++      ++window_frames;
++      if (now - window_start >= freq * 2) {
++        double secs = double(now - window_start) / double(freq);
++        REXLOG_ERROR("GUEST_FPS {:.1f}", window_frames / secs);
++        window_start = now;
++        window_frames = 0;
++      }
++    }
++  }
++
+   // Xenia-specific VdSwap hook.
+   // VdSwap will post this to tell us we need to swap the screen/fire an
+   // interrupt.

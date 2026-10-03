@@ -12,4 +12,5 @@ D=out/build/mac-arm64-release
 # (macOS refuses to load a modified library with a stale signature).
 cp "$SDK/out/mac-arm64/librexgpu-xenos.dylib" "$D/librexgpu-xenos.dylib"
 codesign --force --sign - "$D/librexgpu-xenos.dylib"
-echo "Build done. Play with: scripts/play.sh"
+"$REPO/scripts/make_app.sh" || exit 1
+echo "Build done. Play with: scripts/play.sh  (or open out/Catherine.app)"

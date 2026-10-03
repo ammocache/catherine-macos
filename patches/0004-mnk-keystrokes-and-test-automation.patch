@@ -1,0 +1,268 @@
+diff --git a/src/input/mnk/mnk_input_driver.cpp b/src/input/mnk/mnk_input_driver.cpp
+index 3f9422d..a9d7997 100644
+--- a/src/input/mnk/mnk_input_driver.cpp
++++ b/src/input/mnk/mnk_input_driver.cpp
+@@ -1,3 +1,10 @@
++#include <cctype>
++#include <vector>
++#include <string>
++#include <sstream>
++#include <fstream>
++#include <deque>
++#include <chrono>
+ /**
+  * @file        input/mnk/mnk_input_driver.cpp
+  * @brief       Keyboard/mouse input driver implementation.
+@@ -23,6 +30,122 @@
+ #include <cstring>
+ #include <string_view>
+ 
++
++namespace {
++// Catherine: test automation (env CATH_AUTOMATION=1) lets keyboard input reach the
++// game while its window is in the background, so automated tests can drive menus.
++bool AutomationIgnoresFocus() {
++  static const bool v = std::getenv("CATH_AUTOMATION") != nullptr;
++  return v;
++}
++// Automated key presses arrive faster than the game polls input, so in automation
++// mode every key is held for at least kAutoMinHold.
++constexpr auto kAutoMinHold = std::chrono::milliseconds(150);
++std::chrono::steady_clock::time_point g_auto_press_time[256];
++bool g_auto_release_pending[256] = {};
++
++// ---- Catherine test automation: scripted controller input from a text file ----
++// With CATH_AUTOMATION=1, lines appended to $CATH_AUTOMATION_INPUT (default
++// ~/catherine-project/runner/input.txt) are played back as button presses.
++// Line format: "<BUTTON> [hold_ms]" or "WAIT <ms>". Buttons: A B X Y START BACK
++// UP DOWN LEFT RIGHT (d-pad) LB RB LT RT LS_UP LS_DOWN LS_LEFT LS_RIGHT
++// RS_UP RS_DOWN RS_LEFT RS_RIGHT.
++using namespace rex::input;
++struct AutoStep {
++  uint16_t buttons = 0;
++  uint8_t lt = 0, rt = 0;
++  int32_t lx = 0, ly = 0, rx = 0, ry = 0;
++  int hold_ms = 0;
++};
++struct AutoInputState {
++  std::deque<AutoStep> queue;
++  size_t lines_done = 0;
++  std::chrono::steady_clock::time_point next_poll{};
++  std::chrono::steady_clock::time_point step_end{};
++  bool step_active = false;
++  AutoStep current;
++};
++AutoInputState g_auto;
++
++std::string AutoInputPath() {
++  if (const char* p = std::getenv("CATH_AUTOMATION_INPUT")) return p;
++  const char* home = std::getenv("HOME");
++  return std::string(home ? home : ".") + "/catherine-project/runner/input.txt";
++}
++
++bool ParseAutoLine(const std::string& raw, std::vector<AutoStep>& out) {
++  std::istringstream in(raw);
++  std::string tok;
++  if (!(in >> tok)) return false;
++  for (auto& c : tok) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
++  int ms = 0;
++  in >> ms;
++  AutoStep st;
++  constexpr int32_t M = INT16_MAX;
++  if (tok == "WAIT") { st.hold_ms = ms > 0 ? ms : 500; out.push_back(st); return true; }
++  if (tok == "A") st.buttons = X_INPUT_GAMEPAD_A;
++  else if (tok == "B") st.buttons = X_INPUT_GAMEPAD_B;
++  else if (tok == "X") st.buttons = X_INPUT_GAMEPAD_X;
++  else if (tok == "Y") st.buttons = X_INPUT_GAMEPAD_Y;
++  else if (tok == "START") st.buttons = X_INPUT_GAMEPAD_START;
++  else if (tok == "BACK") st.buttons = X_INPUT_GAMEPAD_BACK;
++  else if (tok == "UP") st.buttons = X_INPUT_GAMEPAD_DPAD_UP;
++  else if (tok == "DOWN") st.buttons = X_INPUT_GAMEPAD_DPAD_DOWN;
++  else if (tok == "LEFT") st.buttons = X_INPUT_GAMEPAD_DPAD_LEFT;
++  else if (tok == "RIGHT") st.buttons = X_INPUT_GAMEPAD_DPAD_RIGHT;
++  else if (tok == "LB") st.buttons = X_INPUT_GAMEPAD_LEFT_SHOULDER;
++  else if (tok == "RB") st.buttons = X_INPUT_GAMEPAD_RIGHT_SHOULDER;
++  else if (tok == "LT") st.lt = 0xFF;
++  else if (tok == "RT") st.rt = 0xFF;
++  else if (tok == "LS_UP") st.ly = M;
++  else if (tok == "LS_DOWN") st.ly = -M;
++  else if (tok == "LS_LEFT") st.lx = -M;
++  else if (tok == "LS_RIGHT") st.lx = M;
++  else if (tok == "RS_UP") st.ry = M;
++  else if (tok == "RS_DOWN") st.ry = -M;
++  else if (tok == "RS_LEFT") st.rx = -M;
++  else if (tok == "RS_RIGHT") st.rx = M;
++  else return false;
++  st.hold_ms = ms > 0 ? ms : 150;
++  out.push_back(st);
++  AutoStep gap;  // release before the next press
++  gap.hold_ms = 150;
++  out.push_back(gap);
++  return true;
++}
++
++// Returns the scripted input for this poll (all zero when idle).
++AutoStep PollAutoInput() {
++  auto now = std::chrono::steady_clock::now();
++  if (now >= g_auto.next_poll) {
++    g_auto.next_poll = now + std::chrono::milliseconds(100);
++    std::ifstream f(AutoInputPath());
++    if (f) {
++      std::vector<std::string> lines;
++      std::string line;
++      while (std::getline(f, line)) lines.push_back(line);
++      if (lines.size() < g_auto.lines_done) g_auto.lines_done = 0;  // file was reset
++      for (size_t i = g_auto.lines_done; i < lines.size(); ++i) {
++        std::vector<AutoStep> steps;
++        if (ParseAutoLine(lines[i], steps)) {
++          REXLOG_ERROR("AUTO_INPUT {}", lines[i]);
++          for (auto& st : steps) g_auto.queue.push_back(st);
++        }
++      }
++      g_auto.lines_done = lines.size();
++    }
++  }
++  if (g_auto.step_active && now >= g_auto.step_end) g_auto.step_active = false;
++  if (!g_auto.step_active && !g_auto.queue.empty()) {
++    g_auto.current = g_auto.queue.front();
++    g_auto.queue.pop_front();
++    g_auto.step_end = now + std::chrono::milliseconds(g_auto.current.hold_ms);
++    g_auto.step_active = true;
++  }
++  return g_auto.step_active ? g_auto.current : AutoStep{};
++}
++}  // namespace
++
+ REXCVAR_DEFINE_BOOL(mnk_mode, false, "Input", "Enable keyboard/mouse controller emulation");
+ REXCVAR_DEFINE_BOOL(mnk_mouse, false, "Input",
+                     "Use the mouse for the right stick. Off means the right stick comes "
+@@ -262,9 +385,9 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+   // Mouse look is opt in. Without this gate, keyboard input alone would hide
+   // and lock the cursor, breaking the ImGui overlays.
+   QueueMouseCaptureUpdate(IsEnabled() && REXCVAR_GET(mnk_mouse) && IsMouseLookActive() &&
+-                          has_focus_ && is_active());
++                          (has_focus_ || AutomationIgnoresFocus()) && is_active());
+ 
+-  if (!is_active() || !has_focus_) {
++  if (!is_active() || !(has_focus_ || AutomationIgnoresFocus())) {
+     if (out_state) {
+       std::memset(out_state, 0, sizeof(*out_state));
+       out_state->packet_number = packet_number_;
+@@ -274,6 +397,16 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+ 
+   std::lock_guard lock(state_mutex_);
+ 
++  if (AutomationIgnoresFocus()) {
++    auto now = std::chrono::steady_clock::now();
++    for (int k = 0; k < 256; ++k) {
++      if (g_auto_release_pending[k] && now - g_auto_press_time[k] >= kAutoMinHold) {
++        key_down_[k] = false;
++        g_auto_release_pending[k] = false;
++      }
++    }
++  }
++
+   uint16_t buttons = 0;
+   if (IsBindPressed(key_down_, REXCVAR_GET(keybind_a)))
+     buttons |= X_INPUT_GAMEPAD_A;
+@@ -343,6 +476,49 @@ X_RESULT MnkInputDriver::GetDeviceState(DeviceId id, X_INPUT_STATE* out_state) {
+   mouse_dx_ = 0.0f;
+   mouse_dy_ = 0.0f;
+ 
++  if (AutomationIgnoresFocus()) {
++    AutoStep a = PollAutoInput();
++    buttons |= a.buttons;
++    lt = std::max(lt, a.lt);
++    rt = std::max(rt, a.rt);
++    lx += a.lx; ly += a.ly; rx += a.rx; ry += a.ry;
++  }
++
++  // Catherine fix: also report presses through XInputGetKeystroke (used by some
++  // game dialogs). Previously this driver never produced keystroke events.
++  {
++    using VK = rex::ui::VirtualKey;
++    struct Map { bool now; bool* prev; VK vk; };
++    static bool p[24] = {};
++    constexpr int32_t kStick = INT16_MAX / 2;
++    Map maps[] = {
++        {(buttons & X_INPUT_GAMEPAD_A) != 0, &p[0], VK::kXInputPadA},
++        {(buttons & X_INPUT_GAMEPAD_B) != 0, &p[1], VK::kXInputPadB},
++        {(buttons & X_INPUT_GAMEPAD_X) != 0, &p[2], VK::kXInputPadX},
++        {(buttons & X_INPUT_GAMEPAD_Y) != 0, &p[3], VK::kXInputPadY},
++        {(buttons & X_INPUT_GAMEPAD_RIGHT_SHOULDER) != 0, &p[4], VK::kXInputPadRShoulder},
++        {(buttons & X_INPUT_GAMEPAD_LEFT_SHOULDER) != 0, &p[5], VK::kXInputPadLShoulder},
++        {lt != 0, &p[6], VK::kXInputPadLTrigger},
++        {rt != 0, &p[7], VK::kXInputPadRTrigger},
++        {(buttons & X_INPUT_GAMEPAD_DPAD_UP) != 0, &p[8], VK::kXInputPadDpadUp},
++        {(buttons & X_INPUT_GAMEPAD_DPAD_DOWN) != 0, &p[9], VK::kXInputPadDpadDown},
++        {(buttons & X_INPUT_GAMEPAD_DPAD_LEFT) != 0, &p[10], VK::kXInputPadDpadLeft},
++        {(buttons & X_INPUT_GAMEPAD_DPAD_RIGHT) != 0, &p[11], VK::kXInputPadDpadRight},
++        {(buttons & X_INPUT_GAMEPAD_START) != 0, &p[12], VK::kXInputPadStart},
++        {(buttons & X_INPUT_GAMEPAD_BACK) != 0, &p[13], VK::kXInputPadBack},
++        {ly > kStick, &p[14], VK::kXInputPadLThumbUp},
++        {ly < -kStick, &p[15], VK::kXInputPadLThumbDown},
++        {lx > kStick, &p[16], VK::kXInputPadLThumbRight},
++        {lx < -kStick, &p[17], VK::kXInputPadLThumbLeft},
++    };
++    for (auto& m : maps) {
++      if (m.now != *m.prev) {
++        *m.prev = m.now;
++        if (keystroke_queue_.size() < 64) EnqueueKeystroke(static_cast<uint16_t>(m.vk), m.now);
++      }
++    }
++  }
++
+   auto clamp16 = [](int32_t v) -> int16_t {
+     return static_cast<int16_t>(std::clamp(v, (int32_t)INT16_MIN, (int32_t)INT16_MAX));
+   };
+@@ -481,10 +657,14 @@ void MnkInputDriver::SetKeyState(uint16_t vk, bool down) {
+ }
+ 
+ void MnkInputDriver::OnKeyDown(rex::ui::KeyEvent& e) {
+-  if (!IsEnabled() || !has_focus_)
++  if (!IsEnabled() || !(has_focus_ || AutomationIgnoresFocus()))
+     return;
+   std::lock_guard lock(state_mutex_);
+   uint16_t vk = static_cast<uint16_t>(e.virtual_key());
++  if (AutomationIgnoresFocus() && vk < 256) {
++    g_auto_press_time[vk] = std::chrono::steady_clock::now();
++    g_auto_release_pending[vk] = false;
++  }
+   SetKeyState(vk, true);
+ }
+ 
+@@ -493,11 +673,16 @@ void MnkInputDriver::OnKeyUp(rex::ui::KeyEvent& e) {
+     return;
+   std::lock_guard lock(state_mutex_);
+   uint16_t vk = static_cast<uint16_t>(e.virtual_key());
++  if (AutomationIgnoresFocus() && vk < 256 &&
++      std::chrono::steady_clock::now() - g_auto_press_time[vk] < kAutoMinHold) {
++    g_auto_release_pending[vk] = true;  // released later by GetDeviceState
++    return;
++  }
+   SetKeyState(vk, false);
+ }
+ 
+ void MnkInputDriver::OnMouseDown(rex::ui::MouseEvent& e) {
+-  if (!IsEnabled() || !has_focus_)
++  if (!IsEnabled() || !(has_focus_ || AutomationIgnoresFocus()))
+     return;
+   std::lock_guard lock(state_mutex_);
+   switch (e.button()) {
+@@ -535,7 +720,7 @@ void MnkInputDriver::OnMouseUp(rex::ui::MouseEvent& e) {
+ }
+ 
+ void MnkInputDriver::OnMouseMove(rex::ui::MouseEvent& e) {
+-  if (!IsEnabled() || !has_focus_)
++  if (!IsEnabled() || !(has_focus_ || AutomationIgnoresFocus()))
+     return;
+   int32_t x = e.x();
+   int32_t y = e.y();
+@@ -559,6 +744,7 @@ void MnkInputDriver::OnMouseMove(rex::ui::MouseEvent& e) {
+ }
+ 
+ void MnkInputDriver::OnLostFocus(rex::ui::UISetupEvent&) {
++  if (AutomationIgnoresFocus()) return;
+   has_focus_ = false;
+   // Withdraw the request too, or an update queued before the focus loss grabs
+   // the cursor straight back.
