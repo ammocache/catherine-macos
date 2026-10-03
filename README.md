@@ -74,6 +74,39 @@ lets you pick the new folder.
 
 Settings are saved in `~/Library/Application Support/Catherine/catherine.toml`.
 
+## Troubleshooting
+
+**Setup says the game is a different version.** Only the retail *Catherine (USA)* Xbox 360
+release is supported. Setup checks `default.xex` and stops on anything else.
+
+**Setup says "No default.xex in ...".** Choose the extracted game folder itself, the one
+that directly contains `default.xex`.
+
+**Setup asks to copy your game files.** Your game folder is in Downloads, Documents or
+Desktop, which macOS protects, so Catherine would ask for permission after every rebuild.
+Copying is optional, and your original is left untouched.
+
+**Command Line Tools or Homebrew are missing.** Setup tells you which one. Install it, then
+run `./setup.sh` again.
+
+**"A fix didn't apply cleanly" or "The SDK ... has local changes".** The downloaded SDK was
+changed. Reset it with `git -C ../tools/rexglue-sdk checkout .` and run `./setup.sh` again.
+
+**The build failed.** The last lines of `out/setup.log` in the project folder usually say why.
+If they don't help, [open an issue](https://github.com/ammocache/catherine-macos/issues/new/choose)
+and attach that file.
+
+**Catherine shows the "Welcome, Stray Sheep" screen.** It can't find your game files,
+usually because the folder moved. Pick the new folder there.
+
+**A display setting didn't change.** Display mode and window size apply after a restart;
+the settings menu has a *Restart Now* button.
+
+**Reporting a game problem.** Start the game from Terminal with `scripts/play.sh` (in the
+project folder), reproduce the problem, then attach `out/play.log` to your
+[bug report](https://github.com/ammocache/catherine-macos/issues/new/choose).
+Never attach game files.
+
 ## Status
 
 Playable: boots, menus, cutscenes and gameplay work, at a steady 30 fps on a

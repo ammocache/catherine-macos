@@ -1,0 +1,60 @@
+name: Bug report
+description: Something doesn't work during setup or in the game.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check the README's **Troubleshooting** and **Known issues** sections first.
+        **Never attach game files** (default.xex or anything from your game folder). They can't be shared here.
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      options:
+        - During setup (./setup.sh)
+        - When starting the game
+        - In menus or cutscenes
+        - In gameplay
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be reproduced?
+      placeholder: "1. Start the game\n2. Open the settings menu\n3. ..."
+  - type: input
+    id: mac
+    attributes:
+      label: Mac model and memory
+      placeholder: "e.g. MacBook Air M2, 8 GB"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 15.7.2"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Project version
+      description: The release you installed, or the output of `git log -1 --oneline` in the project folder.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Setup problems: attach `out/setup.log` from the project folder.
+        Game problems: start the game from Terminal with `scripts/play.sh`, reproduce the problem, then attach `out/play.log`.
+      placeholder: Drag the log file here, or paste its last lines.
