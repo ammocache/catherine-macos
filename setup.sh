@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Catherine (Xbox 360) for macOS: one-step setup.
 #
-# Builds a native Catherine.app from YOUR OWN copy of the game:
+# Builds Catherine.app from YOUR OWN copy of the game:
 #   1. checks your Mac and installs the build tools (with your OK)
 #   2. downloads the ReXGlue SDK and applies this project's fixes
 #   3. checks that your game files are the supported version
@@ -41,7 +41,7 @@ banner() {
   print -r -- "  $WIRE"
   print -r -- ""
   print -r -- "      ${PINK}${BOLD}✦  C  A  T  H  E  R  I  N  E  ✦${R}"
-  print -r -- "      ${BLUSH}native macOS recompilation  ·  setup${R}"
+  print -r -- "      ${BLUSH}macOS recompilation  ·  setup${R}"
   print -r -- ""
   print -r -- "  $WIRE"
 }

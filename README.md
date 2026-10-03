@@ -1,5 +1,5 @@
 <p align="center"><img src="docs/images/banner.png" alt="Catherine recomp" width="720"></p>
-<p align="center"><i>A native Apple Silicon recompilation of Catherine (Atlus, 2011, Xbox 360)</i></p>
+<p align="center"><i>An Apple Silicon recompilation of Catherine (Atlus, 2011, Xbox 360) &middot; work in progress</i></p>
 
 ---
 
@@ -8,8 +8,13 @@
 > from **your** files, when you run the setup.
 
 This project uses the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) to
-statically recompile the Xbox 360 executable into a native ARM64 macOS app,
-with Xenos graphics translated to Metal (through Vulkan/MoltenVK).
+statically recompile the game's PowerPC code to ARM64, so the game logic runs
+natively on Apple Silicon.
+
+**This is not a native port.** Graphics are still emulated: the Xbox 360 GPU
+(Xenos) runs through the SDK's Xenia-derived emulation layer, on Metal via
+Vulkan/MoltenVK. That layer is behind what current emulators like Xenia Canary
+offer, so expect rough edges. It's a work in progress.
 
 ## What you get
 
@@ -145,7 +150,7 @@ Known issues:
 1. The ReXGlue code generator translates the game's PowerPC code into C++
    (`generated/`, created on your machine and never committed).
 2. That code is compiled together with the ReXGlue runtime (kernel, audio,
-   input, and the Xenos→Vulkan graphics backend) into a native app.
+   input, and the emulated Xenos→Vulkan graphics backend) into a Mac app.
 3. `patches/` holds this project's fixes to the SDK; `src/` holds the app
    (settings menu, setup screen, defaults).
 
