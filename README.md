@@ -34,7 +34,7 @@ with Xenos graphics translated to Metal (through Vulkan/MoltenVK).
 ## Install
 
 ```sh
-git clone <this repository> catherine-project/rex-retail
+git clone https://github.com/ammocache/catherine-macos.git catherine-project/rex-retail
 cd catherine-project/rex-retail
 ./setup.sh
 ```
